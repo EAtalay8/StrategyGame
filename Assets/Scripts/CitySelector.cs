@@ -70,7 +70,18 @@ public class CitySelector : MonoBehaviour
             if (activeParticle == null)
             {
                 activeParticle = Instantiate(selectionParticlePrefab, transform);
-                activeParticle.transform.localPosition = Vector3.zero;
+
+                // Þehir merkezini otomatik olarak hesapla
+                Renderer[] renderers = GetComponentsInChildren<Renderer>();
+                Vector3 cityCenter = Vector3.zero;
+
+                foreach (Renderer renderer in renderers)
+                {
+                    cityCenter += renderer.bounds.center;
+                }
+                cityCenter /= renderers.Length;
+
+                activeParticle.transform.position = cityCenter;
             }
 
             activeParticle.SetActive(true);

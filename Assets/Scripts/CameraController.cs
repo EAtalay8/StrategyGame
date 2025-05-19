@@ -2,59 +2,90 @@ using UnityEngine;
 
 public class CameraController : MonoBehaviour
 {
+    [Header("Movement Settings")]
     public float moveSpeed = 10f;
+
+    [Header("Zoom Settings (Perspective)")]
     public float zoomSpeed = 10f;
-    public float minZoom = 5f;
-    public float maxZoom = 50f;
+    public float minZoom = 20f; // Minimum Field of View (FOV)
+    public float maxZoom = 60f; // Maximum Field of View (FOV)
+
+    [Header("Rotation Settings")]
+    public float rotationSpeed = 100f;
+    public float rotationSmoothing = 5f;
+    public float minRotationX = -45f;
+    public float maxRotationX = 45f;
 
     private Camera cam;
+    private float currentRotationX = 0f; // Mevcut X ekseni rotasyonu
+    private float targetRotationX = 0f;  // Hedef X ekseni rotasyonu
+    private bool isRotating = false;     // Sað týk ile rotasyon kontrolü
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         cam = GetComponent<Camera>();
+        if (cam == null)
+        {
+            Debug.LogError("Camera bileþeni bulunamadý! Lütfen bu scripti bir Kamera objesine ekleyin.");
+        }
+
+        // Baþlangýç rotasyonunu mevcut pozisyon olarak ayarla
+        currentRotationX = transform.eulerAngles.x;
+        targetRotationX = currentRotationX;
     }
 
-    // Update is called once per frame
     void Update()
     {
         HandleMovement();
         HandleZoom();
+        HandleRotation();
     }
 
+    // WASD veya Yön Tuþlarý ile Hareket
     void HandleMovement()
     {
         float horizontal = Input.GetAxis("Horizontal"); // A,D
-        float vertical = Input.GetAxis("Vertical"); // W,S
+        float vertical = Input.GetAxis("Vertical");     // W,S
 
         Vector3 move = new Vector3(horizontal, 0, vertical) * moveSpeed * Time.deltaTime;
         transform.Translate(move, Space.World);
     }
 
+    // Fare Kaydýrma ile Zoom (FOV - Field of View)
     void HandleZoom()
     {
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         if (scroll != 0f)
         {
-            Vector3 mousePos = Input.mousePosition;
-            Ray ray = cam.ScreenPointToRay(mousePos);
+            // Zoom'u FOV ile kontrol et (Perspective)
+            float newFOV = cam.fieldOfView - scroll * zoomSpeed;
+            cam.fieldOfView = Mathf.Clamp(newFOV, minZoom, maxZoom);
 
-            Vector3 targetPoint;
-            if (Physics.Raycast(ray, out RaycastHit hit))
-            {
-                targetPoint = hit.point; // Çarptýðý noktaya zoom yap
-            }
-            else
-            {
-                targetPoint = ray.origin + ray.direction * 10f; // Boþluða bakýyorsa 10 birim uzaða bak
-            }
-
-            Vector3 direction = targetPoint - cam.transform.position;
-            float newZoom = Mathf.Clamp(cam.orthographicSize - scroll * zoomSpeed, minZoom, maxZoom);
-            cam.orthographicSize = newZoom;
-
-            // Kamera hedef noktaya yaklaþsýn
-            transform.position += direction.normalized * scroll * zoomSpeed * 0.5f;
+            Debug.Log("Zoom (FOV): " + cam.fieldOfView); // Test için zoom deðerini gör
         }
+    }
+
+    // Sað Týk ile Smooth X Ekseninde Dönüþ (Rotation)
+    void HandleRotation()
+    {
+        if (Input.GetMouseButtonDown(1)) // Sað týk basýlý tutulunca
+        {
+            isRotating = true;
+        }
+        else if (Input.GetMouseButtonUp(1))
+        {
+            isRotating = false;
+        }
+
+        if (isRotating)
+        {
+            float mouseY = Input.GetAxis("Mouse Y");
+            targetRotationX -= mouseY * rotationSpeed * Time.deltaTime; // X ekseninde yukarý-aþaðý
+            targetRotationX = Mathf.Clamp(targetRotationX, minRotationX, maxRotationX);
+        }
+
+        // Smooth Lerp ile yumuþak geçiþ
+        currentRotationX = Mathf.Lerp(currentRotationX, targetRotationX, rotationSmoothing * Time.deltaTime);
+        transform.rotation = Quaternion.Euler(currentRotationX, transform.eulerAngles.y, 0);
     }
 }
