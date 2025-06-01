@@ -55,14 +55,34 @@ public class CameraController : MonoBehaviour
     void HandleZoom()
     {
         float scroll = Input.GetAxis("Mouse ScrollWheel");
-        if (scroll != 0f)
-        {
-            // Zoom'u FOV ile kontrol et (Perspective)
-            float newFOV = cam.fieldOfView - scroll * zoomSpeed;
-            cam.fieldOfView = Mathf.Clamp(newFOV, minZoom, maxZoom);
+        if (scroll == 0f) return;
 
-            Debug.Log("Zoom (FOV): " + cam.fieldOfView); // Test için zoom deðerini gör
-        }
+        Ray rayBefore = cam.ScreenPointToRay(Input.mousePosition);
+        Vector3 preZoomPoint;
+
+        // 1. Zoom öncesi mouse'un baktýðý nokta
+        if (Physics.Raycast(rayBefore, out RaycastHit preHit))
+            preZoomPoint = preHit.point;
+        else
+            preZoomPoint = rayBefore.origin + rayBefore.direction * 100f; // Boþluða bakýyorsa ileri bir nokta
+
+        // 2. FOV'u deðiþtir
+        float currentFOV = cam.fieldOfView;
+        float newFOV = Mathf.Clamp(currentFOV - scroll * zoomSpeed, minZoom, maxZoom);
+        cam.fieldOfView = newFOV;
+
+        // 3. Zoom sonrasý mouse'un baktýðý nokta
+        Ray rayAfter = cam.ScreenPointToRay(Input.mousePosition);
+        Vector3 postZoomPoint;
+
+        if (Physics.Raycast(rayAfter, out RaycastHit postHit))
+            postZoomPoint = postHit.point;
+        else
+            postZoomPoint = rayAfter.origin + rayAfter.direction * 100f;
+
+        // 4. Kamerayý fark kadar telafi et
+        Vector3 offset = preZoomPoint - postZoomPoint;
+        cam.transform.position += offset;
     }
 
     // Sað Týk ile Smooth X Ekseninde Dönüþ (Rotation)
