@@ -41,4 +41,17 @@ public class CityInformationPanel : MonoBehaviour
             if (taxRateText != null) taxRateText.text = "Tax: %" + city.taxRate.ToString();
         }
     }
+
+    // UI'daki "Insaat/Build" butonuna baglanacak fonksiyon
+    public void OnBuildModeButtonClicked()
+    {
+        if (CitySelector.activeCity != null)
+        {
+            CitySelector.activeCity.ToggleBuildMode();
+        }
+        else
+        {
+            Debug.LogWarning("Active City is null but Build Button clicked.");
+        }
+    }
 }

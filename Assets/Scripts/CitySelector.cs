@@ -1,96 +1,103 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
-/// <summary>
-/// Þehir seçildiðinde Particle Circle'ý otomatik açar/kapatýr ve UI panelini yönetir.
-/// </summary>
 public class CitySelector : MonoBehaviour
 {
-    [Header("Selection Particle Settings")]
-    public GameObject selectionParticlePrefab; // Seçim çemberi için Particle Circle prefab (Inspector’dan atanacak)
-    private GameObject activeParticle;
+    public static CitySelector activeCity; // SeÃ§ili ÅŸehri tutmak iÃ§in static referans
+    public GameObject particlePrefab;       // Åžehir seÃ§ildiÄŸinde Ã§Ä±kacak Particle System Prefab
+    private GameObject activeParticle;      // Sahnedeki aktif particle objesi
+    
+    private bool isBuildModeActive = false; // Insaat modu aktif mi?
 
-    [Header("UI Settings")]
-    public CityReference cityRef; // Þehir bilgisi için referans (ID)
-    private static CitySelector activeCity; // Þu anda seçili þehir
+    //public GameObject outlineObj;         // Shader Graph outline objesi (ArtÄ±k ObjectOutline.cs kullanÄ±lÄ±yor)
 
     void Start()
     {
-        if (selectionParticlePrefab == null)
+        // Particle prefabÄ± oluÅŸtur ama baÅŸta kapalÄ± olsun
+        if (particlePrefab != null)
         {
-            Debug.LogWarning("Selection Particle Prefab atanmamýþ!");
-        }
-
-        // Baþlangýçta seçim efekti gizli olmalý
-        if (activeParticle != null)
-        {
+            activeParticle = Instantiate(particlePrefab, transform.position, Quaternion.identity);
+            activeParticle.transform.SetParent(transform); // Åžehrin Ã§ocuÄŸu yap
             activeParticle.SetActive(false);
         }
     }
 
-    void Update()
+    void OnMouseDown()
     {
-        if (Input.GetMouseButtonDown(0))
-        {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit))
-            {
-                // Þehre týklanýp týklanmadýðýný kontrol et
-                CitySelector clickedCity = hit.transform.GetComponentInParent<CitySelector>();
+        // EÄŸer UI Ã¼zerindeysek (tÄ±klama UI'ye geldiyse) ÅŸehir seÃ§meyi engelle
+        if (EventSystem.current.IsPointerOverGameObject())
+            return;
 
-                if (clickedCity != null)
-                {
-                    clickedCity.SelectCity();
-                }
-                else if (activeCity != null)
-                {
-                    activeCity.DeselectCity();
-                }
-            }
-            else if (activeCity != null)
-            {
-                activeCity.DeselectCity();
-            }
-        }
+        SelectCity();
     }
 
-    /// <summary>
-    /// Þehri seçer ve Particle Circle ile UI panelini açar.
-    /// </summary>
     public void SelectCity()
     {
-        // Baþka bir þehir seçiliyse önce onu kapat
+        // EÄŸer zaten baÅŸka bir ÅŸehir seÃ§iliyse, Ã¶nce onu kapat
         if (activeCity != null && activeCity != this)
         {
             activeCity.DeselectCity();
         }
 
-        // Particle Circle'ý oluþtur veya aktif et
-        if (selectionParticlePrefab != null)
+        // Particle Circle'Ä± aÃ§
+        if (activeParticle != null)
         {
-            if (activeParticle == null)
+            // Åžehrin tam ortasÄ±nÄ± bulmak iÃ§in Renderer kullanabiliriz (opsiyonel)
+            // MeshRenderer[] renderers = GetComponentsInChildren<MeshRenderer>();
+            // if (renderers.Length > 0) ... center hesapla ...
+            // Åžimdilik direkt transform.position kullanÄ±yoruz.
+            
+            // EÄŸer objenin merkezi aÅŸaÄŸÄ±daysa, particle'Ä± biraz yukarÄ± kaldÄ±rabiliriz
+            // activeParticle.transform.position = transform.position + Vector3.up * 0.1f;
+
+            // EÄŸer AutoCityCollider kullanÄ±yorsak, collider center'Ä± daha doÄŸru olabilir
+            // Merkez noktasini hesaplayalim
+            Vector3 finalCenter = transform.position;
+
+            // 1. Varsa Collider merkezini al (En garantisi bu)
+            Collider col = GetComponent<Collider>();
+            if (col != null)
             {
-                activeParticle = Instantiate(selectionParticlePrefab, transform);
-
-                // Þehir merkezini otomatik olarak hesapla
-                Renderer[] renderers = GetComponentsInChildren<Renderer>();
-                Vector3 cityCenter = Vector3.zero;
-
-                foreach (Renderer renderer in renderers)
+                Debug.Log($"CitySelector: Found Collider on {name}. Bounds Center: {col.bounds.center}");
+                finalCenter = col.bounds.center;
+            }
+            // 2. Yoksa Renderer'larin ortalamasini al
+            else
+            {
+                Debug.LogWarning($"CitySelector: No Collider found on {name} (Root). Checking Renderers...");
+                MeshRenderer[] renderers = GetComponentsInChildren<MeshRenderer>();
+                if (renderers.Length > 0)
                 {
-                    cityCenter += renderer.bounds.center;
+                    Bounds combinedBounds = renderers[0].bounds;
+                    for (int i = 1; i < renderers.Length; i++)
+                    {
+                        combinedBounds.Encapsulate(renderers[i].bounds);
+                    }
+                    finalCenter = combinedBounds.center;
                 }
-                cityCenter /= renderers.Length;
-
-                activeParticle.transform.position = cityCenter;
             }
 
+            // Yuksekligi (Y) bozma, yer seviyesinde kalsin
+            finalCenter.y = transform.position.y;
+            
+            // Particle'i oraya tasi
+            activeParticle.transform.position = finalCenter;
             activeParticle.SetActive(true);
         }
 
-        // UI paneli ve þehir bilgisi göster
+        // UI paneli ve ÅŸehir bilgisi gÃ¶ster
+        // ?? CityReference ile ID al, sonra GameManager'dan ÅŸehri bul
+        CityReference cityRef = GetComponent<CityReference>();
         if (cityRef != null)
         {
             CityInformationPanel.Instance.ShowCityInfo(cityRef.cityID);
+
+            // Building Slots Goster
+            // City city = GameManager.Instance.GetCityByID(cityRef.cityID);
+            // if (city != null && BuildingManager.Instance != null)
+            // {
+            //     // ARTIK OTOMATIK GOSTERMIYORUZ - BUTONA TIKLAYINCA GELECEK
+            // }
         }
 
         UIManager.Instance.ShowPanel();
@@ -98,26 +105,97 @@ public class CitySelector : MonoBehaviour
     }
 
     /// <summary>
-    /// Þehir seçimini kaldýrýr, Particle Circle ve UI panelini kapatýr.
+    /// Åžehir seÃ§imini kaldÄ±rÄ±r, Particle Circle ve UI panelini kapatÄ±r.
     /// </summary>
     public void DeselectCity()
     {
-        // Particle Circle'ý kapat
+        // Particle Circle'Ä± kapat
         if (activeParticle != null)
         {
             activeParticle.SetActive(false);
         }
 
+        // Secim kalkinca build modunu da kapat ve temizle
+        if (isBuildModeActive)
+        {
+             BuildingManager.Instance.HideSlots();
+
+             // Kamerayi eski haline dondur
+             Camera cam = Camera.main;
+             if (cam != null)
+             {
+                 CameraController camCtrl = cam.GetComponent<CameraController>();
+                 if (camCtrl != null)
+                 {
+                     camCtrl.RestoreCameraState();
+                 }
+             }
+
+             isBuildModeActive = false;
+        }
+
         // UI panelini kapat
         UIManager.Instance.HidePanel();
+        
+        // Building Slots Kapat
+        if (BuildingManager.Instance != null)
+        {
+            BuildingManager.Instance.HideSlots();
+        }
+
         activeCity = null;
     }
 
     /// <summary>
-    /// UI panelinden þehir kapatýldýðýnda çaðrýlýr.
+    /// UI panelinden ÅŸehir kapatÄ±ldÄ±ÄŸÄ±nda Ã§aÄŸrÄ±lÄ±r.
     /// </summary>
     public void ClosePanel()
     {
         DeselectCity();
+    }
+
+    // UI Butonundan cagrilacak fonksiyon
+    public void ToggleBuildMode()
+    {
+        if (activeCity != this) return;
+
+        CityReference cityRef = GetComponent<CityReference>();
+        if (cityRef == null) return;
+        
+        City city = GameManager.Instance.GetCityByID(cityRef.cityID);
+        if (city == null) return;
+
+        Camera cam = Camera.main;
+        CameraController camCtrl = (cam != null) ? cam.GetComponent<CameraController>() : null;
+
+        if (!isBuildModeActive)
+        {
+            // AKTIF ET
+            // 1. Slotlari Goster
+            Vector3 centerPos = activeParticle != null ? activeParticle.transform.position : transform.position;
+            BuildingManager.Instance.ShowSlots(city, centerPos, transform.rotation);
+
+            // 2. Kamerayi Odakla
+            if (camCtrl != null)
+            {
+                camCtrl.FocusOnCity(centerPos);
+            }
+            
+            isBuildModeActive = true;
+        }
+        else
+        {
+            // KAPAT
+            // 1. Slotlari Gizle
+            BuildingManager.Instance.HideSlots();
+
+            // 2. Kamerayi Geri Getir
+            if (camCtrl != null)
+            {
+                camCtrl.RestoreCameraState();
+            }
+            
+            isBuildModeActive = false;
+        }
     }
 }
