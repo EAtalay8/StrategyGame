@@ -4,44 +4,24 @@ using UnityEngine.UI;
 public class CityInformationPanel : MonoBehaviour
 {
     public static CityInformationPanel Instance;
-
+    public GameObject panel;
+    
+    [Header("UI Text Components")]
     public Text cityNameText;
     public Text populationText;
     public Text religionText;
     public Text taxRateText;
-    public Text rebellionText;
 
-    private void Awake()
+    void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance == null)
+            Instance = this;
+        else
+            Destroy(gameObject);
     }
 
-    /*public void ShowCityInfo(string cityName)
+    public void ShowPanel()
     {
-        City city = GameManager.Instance.GetCityByName(cityName);
-        if (city == null) return;
-
-        cityNameText.text = "City: " + city.cityName;
-        populationText.text = "Population: " + city.population;
-        religionText.text = "Religion: " + city.religion;
-        taxRateText.text = "Tax Rate: %" + city.taxRate;
-        rebellionText.text = city.isRebelling ? "Rebellion Status: ? Ýsyan Var!" : "Ýsyan Durumu: Huzur Var";
-
-        gameObject.SetActive(true);
-    }*/
-
-    public void ShowCityInfo(int cityID)
-    {
-        City city = GameManager.Instance.GetCityByID(cityID);
-        if (city == null) return;
-
-        cityNameText.text = "City: " + city.cityName;
-        populationText.text = "Population: " + city.population;
-        religionText.text = "Religion: " + city.religion;
-        taxRateText.text = "Tax Rate: %" + city.taxRate;
-        rebellionText.text = city.isRebelling ? "Rebellion Status: ? Ýsyan Var!" : "Ýsyan Durumu: Huzur Var";
-
         gameObject.SetActive(true);
     }
 
@@ -49,36 +29,16 @@ public class CityInformationPanel : MonoBehaviour
     {
         gameObject.SetActive(false);
     }
-}
 
-/*// Singleton 
-public static CityInformationPanel Instance { get; private set; }
-
-public Text cityNameText;  // Þehir ismini yazdýracaðýmýz Text UI elemaný
-
-private string currentCityName;
-
-private void Awake()
-{
-    // Eðer baþka bir CityInformationPanel örneði varsa, bu objeyi yok et
-    if (Instance != null && Instance != this)
+    public void ShowCityInfo(int cityID)
     {
-        Destroy(gameObject);
-    }
-    else
-    {
-        Instance = this;  // Singleton örneðini ayarla
-        DontDestroyOnLoad(gameObject);  // Bu objenin sahneler arasý kaybolmamasýný saðla
+        City city = GameManager.Instance.GetCityByID(cityID);
+        if (city != null)
+        {
+            if (cityNameText != null) cityNameText.text = city.cityName;
+            if (populationText != null) populationText.text = "Population: " + city.population.ToString();
+            if (religionText != null) religionText.text = "Religion: " + city.religion;
+            if (taxRateText != null) taxRateText.text = "Tax: %" + city.taxRate.ToString();
+        }
     }
 }
-// Bu fonksiyon þehre týklandýðýnda ismi güncelleyecek
-public void SetCityName(string cityName)
-{
-    currentCityName = cityName;
-    cityNameText.text = currentCityName;  // Þehir ismini Text'e atýyoruz
-}
-
-public void ShowCityInfo(string cityName)
-{
-    SetCityName(cityName);  // Þehir adýný güncelle
-}*/ 

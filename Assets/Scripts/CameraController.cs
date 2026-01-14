@@ -12,26 +12,19 @@ public class CameraController : MonoBehaviour
 
     [Header("Rotation Settings")]
     public float rotationSpeed = 100f;
-    public float rotationSmoothing = 5f;
-    public float minRotationX = -45f;
-    public float maxRotationX = 45f;
+    public float minRotationX = 10f; // Yere carpmasin diye min aci
+    public float maxRotationX = 85f; // Tam tepeye dikilmeyelim
 
     private Camera cam;
-    private float currentRotationX = 0f; // Mevcut X ekseni rotasyonu
-    private float targetRotationX = 0f;  // Hedef X ekseni rotasyonu
-    private bool isRotating = false;     // Sað týk ile rotasyon kontrolü
+    private bool isRotating = false;
 
     void Start()
     {
         cam = GetComponent<Camera>();
         if (cam == null)
         {
-            Debug.LogError("Camera bileþeni bulunamadý! Lütfen bu scripti bir Kamera objesine ekleyin.");
+            Debug.LogError("Component 'Camera' not found! Please attach this script to a Camera object.");
         }
-
-        // Baþlangýç rotasyonunu mevcut pozisyon olarak ayarla
-        currentRotationX = transform.eulerAngles.x;
-        targetRotationX = currentRotationX;
     }
 
     void Update()
@@ -41,71 +34,112 @@ public class CameraController : MonoBehaviour
         HandleRotation();
     }
 
-    // WASD veya Yön Tuþlarý ile Hareket
+    // WASD veya YÃ¶n TuÅŸlarÄ± ile Hareket
     void HandleMovement()
     {
         float horizontal = Input.GetAxis("Horizontal"); // A,D
         float vertical = Input.GetAxis("Vertical");     // W,S
 
-        Vector3 move = new Vector3(horizontal, 0, vertical) * moveSpeed * Time.deltaTime;
+        // Kameranin baktigi yone gore hareket etmek icin transform.forward kullaniyoruz ama Y eksenini sifirliyoruz
+        Vector3 forward = transform.forward;
+        forward.y = 0;
+        forward.Normalize();
+        
+        Vector3 right = transform.right;
+        right.y = 0;
+        right.Normalize();
+
+        Vector3 move = (right * horizontal + forward * vertical) * moveSpeed * Time.deltaTime;
         transform.Translate(move, Space.World);
     }
 
-    // Fare Kaydýrma ile Zoom (FOV - Field of View)
+    // Fare KaydÄ±rma ile Zoom (FOV - Field of View)
     void HandleZoom()
     {
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         if (scroll == 0f) return;
 
-        Ray rayBefore = cam.ScreenPointToRay(Input.mousePosition);
-        Vector3 preZoomPoint;
+        Vector3 preZoomPoint = GetMouseGroundPoint();
 
-        // 1. Zoom öncesi mouse'un baktýðý nokta
-        if (Physics.Raycast(rayBefore, out RaycastHit preHit))
-            preZoomPoint = preHit.point;
-        else
-            preZoomPoint = rayBefore.origin + rayBefore.direction * 100f; // Boþluða bakýyorsa ileri bir nokta
-
-        // 2. FOV'u deðiþtir
+        // FOV'u deÄŸiÅŸtir
         float currentFOV = cam.fieldOfView;
         float newFOV = Mathf.Clamp(currentFOV - scroll * zoomSpeed, minZoom, maxZoom);
         cam.fieldOfView = newFOV;
 
-        // 3. Zoom sonrasý mouse'un baktýðý nokta
-        Ray rayAfter = cam.ScreenPointToRay(Input.mousePosition);
-        Vector3 postZoomPoint;
+        Vector3 postZoomPoint = GetMouseGroundPoint();
 
-        if (Physics.Raycast(rayAfter, out RaycastHit postHit))
-            postZoomPoint = postHit.point;
-        else
-            postZoomPoint = rayAfter.origin + rayAfter.direction * 100f;
-
-        // 4. Kamerayý fark kadar telafi et
+        // KamerayÄ± fark kadar telafi et (Zoom to cursor)
         Vector3 offset = preZoomPoint - postZoomPoint;
         cam.transform.position += offset;
     }
 
-    // Sað Týk ile Smooth X Ekseninde Dönüþ (Rotation)
+    // Mouse imlecinin altindaki yer noktasi
+    Vector3 GetMouseGroundPoint()
+    {
+        return GetGroundPoint(Input.mousePosition);
+    }
+
+    // Ekranin tam ortasindaki yer noktasi (Pivot)
+    Vector3 GetCenterGroundPoint()
+    {
+        return GetGroundPoint(new Vector3(Screen.width / 2f, Screen.height / 2f, 0));
+    }
+
+    // Parametrik yer bulucu (Raycast veya Plane)
+    Vector3 GetGroundPoint(Vector3 screenPos)
+    {
+        Ray ray = cam.ScreenPointToRay(screenPos);
+        
+        if (Physics.Raycast(ray, out RaycastHit hit))
+        {
+            return hit.point;
+        }
+        else
+        {
+            Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
+            if (groundPlane.Raycast(ray, out float enter))
+            {
+                return ray.GetPoint(enter);
+            }
+            return ray.origin + ray.direction * 100f;
+        }
+    }
+
+    // Mouse Orta TuÅŸ ile Pivot EtrafÄ±nda DÃ¶nÃ¼ÅŸ (Orbit)
     void HandleRotation()
     {
-        if (Input.GetMouseButtonDown(1)) // Sað týk basýlý tutulunca
+        if (Input.GetMouseButtonDown(2)) 
         {
             isRotating = true;
         }
-        else if (Input.GetMouseButtonUp(1))
+        else if (Input.GetMouseButtonUp(2))
         {
             isRotating = false;
         }
 
         if (isRotating)
         {
-            float mouseY = Input.GetAxis("Mouse Y");
-            targetRotationX -= mouseY * rotationSpeed * Time.deltaTime; // X ekseninde yukarý-aþaðý
-            targetRotationX = Mathf.Clamp(targetRotationX, minRotationX, maxRotationX);
-        }
+            float mouseY = Input.GetAxis("Mouse Y"); // Yukari asagi mouse hareketi
+            float rotationAmount = -mouseY * rotationSpeed * Time.deltaTime;
 
-        // Smooth Lerp ile yumuþak geçiþ
-        currentRotationX = Mathf.Lerp(currentRotationX, targetRotationX, rotationSmoothing * Time.deltaTime);
-        transform.rotation = Quaternion.Euler(currentRotationX, transform.eulerAngles.y, 0);
+            // Su anki aciyi kontrol et
+            float currentX = transform.eulerAngles.x;
+            
+            // Hedef aci limitleri asiyor mu?
+            // Eger 90'i gecerse ters doner, 0in altina duserse yere girer.
+            // Basit bir Euler tahmini yapiyoruz:
+            float nextX = currentX + rotationAmount;
+            
+            // Euler acilari 0-360 arasi oldugu icin negatif degerleri duzeltelim
+            if (nextX > 180) nextX -= 360; 
+
+            // Limit kontrolu
+            if (nextX >= minRotationX && nextX <= maxRotationX)
+            {
+                // ISLEM: Pivot noktasini bul ve etrafinda cevir
+                Vector3 pivotPoint = GetCenterGroundPoint();
+                transform.RotateAround(pivotPoint, transform.right, rotationAmount);
+            }
+        }
     }
 }
